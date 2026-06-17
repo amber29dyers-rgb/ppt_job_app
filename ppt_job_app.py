@@ -1780,7 +1780,7 @@ def _apply_tab2_editor_edits(base_df, edited_show, area_only, job_notes_col):
 
 
 def _load_master_rates_dataframe():
-    """Load master rates from DB, bundled xlsx, or built-in defaults when nothing is saved yet."""
+    """Load master rates from DB, or built-in hardcoded defaults."""
     loaded = db_local.load_custom_rates()
     if len(loaded) == 4:
         custom_rates, custom_units, custom_notes, sort_orders = loaded
@@ -1800,12 +1800,6 @@ def _load_master_rates_dataframe():
             for i, item in enumerate(custom_rates)
         ]
         return pd.DataFrame(data)
-    csv_df = _load_master_rates_from_csv()
-    if csv_df is not None and not csv_df.empty:
-        return csv_df
-    xlsx_df = _load_master_rates_from_xlsx()
-    if xlsx_df is not None and not xlsx_df.empty:
-        return xlsx_df
     return pd.DataFrame(DEFAULT_MASTER_RATES)
 
 
@@ -1893,13 +1887,7 @@ def _load_master_rates_from_csv():
 
 
 def _load_bundled_master_rates_defaults():
-    """Load bundled defaults from CSV, then XLSX, then fallback constants."""
-    csv_df = _load_master_rates_from_csv()
-    if csv_df is not None and not csv_df.empty:
-        return csv_df
-    xlsx_df = _load_master_rates_from_xlsx()
-    if xlsx_df is not None and not xlsx_df.empty:
-        return xlsx_df
+    """Load hardcoded paint-rate defaults."""
     return pd.DataFrame(DEFAULT_MASTER_RATES)
 
 
@@ -1942,7 +1930,45 @@ _MASTER_RATES_EDITOR_KEY = "master_rates_editor"
 
 
 # Default master rates when nothing is saved in the database yet
-DEFAULT_MASTER_RATES = []
+DEFAULT_MASTER_RATES = [
+    {"Item": "High Pressure Washing", "Unit": "each", "Material (R/unit)": 980, "Labour (R/unit)": 700, "Default Job Notes": ""},
+    {"Item": "Roof Wash", "Unit": "m²", "Material (R/unit)": 12, "Labour (R/unit)": 60, "Default Job Notes": ""},
+    {"Item": "Plaster Repair", "Unit": "m²", "Material (R/unit)": 80, "Labour (R/unit)": 50, "Default Job Notes": ""},
+    {"Item": "Crack Repairs", "Unit": "m²", "Material (R/unit)": 115, "Labour (R/unit)": 70, "Default Job Notes": ""},
+    {"Item": "Wood Repair", "Unit": "lm", "Material (R/unit)": 50, "Labour (R/unit)": 50, "Default Job Notes": ""},
+    {"Item": "Aluminium Restore", "Unit": "each", "Material (R/unit)": 11, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Mould and Fungi Treatment", "Unit": "m²", "Material (R/unit)": 12, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Skimming", "Unit": "m²", "Material (R/unit)": 45, "Labour (R/unit)": 90, "Default Job Notes": ""},
+    {"Item": "Facias/Gutters", "Unit": "lm", "Material (R/unit)": 30, "Labour (R/unit)": 40, "Default Job Notes": ""},
+    {"Item": "Exterior Walls Paintwork", "Unit": "m²", "Material (R/unit)": 60, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Exterior Walls- Textured Intermediate", "Unit": "m²", "Material (R/unit)": 78, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Roof Painting", "Unit": "m²", "Material (R/unit)": 80, "Labour (R/unit)": 65, "Default Job Notes": ""},
+    {"Item": "Windows/Doors- Paint Metal", "Unit": "each", "Material (R/unit)": 185, "Labour (R/unit)": 275, "Default Job Notes": ""},
+    {"Item": "Windows/ Doors- Paint Wood", "Unit": "each", "Material (R/unit)": 150, "Labour (R/unit)": 225, "Default Job Notes": ""},
+    {"Item": "Windows/Doors- Timber Preserve", "Unit": "each", "Material (R/unit)": 125, "Labour (R/unit)": 175, "Default Job Notes": ""},
+    {"Item": "Windows/Doors- Varnish Wood", "Unit": "each", "Material (R/unit)": 175, "Labour (R/unit)": 275, "Default Job Notes": ""},
+    {"Item": "Paint Wood", "Unit": "m²", "Material (R/unit)": 60, "Labour (R/unit)": 45, "Default Job Notes": ""},
+    {"Item": "Varnish Wood", "Unit": "m²", "Material (R/unit)": 51, "Labour (R/unit)": 55, "Default Job Notes": ""},
+    {"Item": "Timber Preserve", "Unit": "m²", "Material (R/unit)": 70, "Labour (R/unit)": 45, "Default Job Notes": ""},
+    {"Item": "Paint Galvanised Metal", "Unit": "m²", "Material (R/unit)": 125, "Labour (R/unit)": 45, "Default Job Notes": ""},
+    {"Item": "Paint Metal", "Unit": "m²", "Material (R/unit)": 75, "Labour (R/unit)": 55, "Default Job Notes": ""},
+    {"Item": "Interior Walls Paintwork", "Unit": "m²", "Material (R/unit)": 55, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Interior Walls- Textured Intermediate", "Unit": "m²", "Material (R/unit)": 72, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Ceiling/Soffits", "Unit": "m²", "Material (R/unit)": 47, "Labour (R/unit)": 55, "Default Job Notes": ""},
+    {"Item": "Skirtings", "Unit": "lm", "Material (R/unit)": 45, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Cornices", "Unit": "lm", "Material (R/unit)": 35, "Labour (R/unit)": 35, "Default Job Notes": ""},
+    {"Item": "Waterproofing Rising Damp/ Horizontals", "Unit": "m²", "Material (R/unit)": 140, "Labour (R/unit)": 80, "Default Job Notes": ""},
+    {"Item": "Waterproofing Roofs/Concrete Deks", "Unit": "m²", "Material (R/unit)": 135, "Labour (R/unit)": 80, "Default Job Notes": ""},
+    {"Item": "Wood Floors - Sanded to Renew & Varnish", "Unit": "m²", "Material (R/unit)": 105, "Labour (R/unit)": 65, "Default Job Notes": ""},
+    {"Item": "Wood Floors- Rails/ Decks Varnish", "Unit": "m²", "Material (R/unit)": 45, "Labour (R/unit)": 55, "Default Job Notes": ""},
+    {"Item": "Floors- Tile Remove", "Unit": "each", "Material (R/unit)": 750, "Labour (R/unit)": 350, "Default Job Notes": ""},
+    {"Item": "Floors- Cup Grind (Prep)", "Unit": "m²", "Material (R/unit)": 30, "Labour (R/unit)": 45, "Default Job Notes": ""},
+    {"Item": "Floors- Cup Grind (Final)", "Unit": "m²", "Material (R/unit)": 75, "Labour (R/unit)": 90, "Default Job Notes": ""},
+    {"Item": "Floors- Pigmented Floor Cote", "Unit": "m²", "Material (R/unit)": 750, "Labour (R/unit)": 150, "Default Job Notes": ""},
+    {"Item": "Floors- 504 Surface Tolerant Epoxy", "Unit": "m²", "Material (R/unit)": 150, "Labour (R/unit)": 60, "Default Job Notes": ""},
+    {"Item": "Floors- FC Marble (Cement Application)", "Unit": "m²", "Material (R/unit)": 306, "Labour (R/unit)": 90, "Default Job Notes": ""},
+    {"Item": "Floors- FC Marble (Tile Application)", "Unit": "m²", "Material (R/unit)": 465, "Labour (R/unit)": 180, "Default Job Notes": ""},
+]
 
 
 _ADDITIONAL_RATE_UNIT_OPTIONS = ["per day", "per km", "per 1000 liters", "per litre"]
@@ -2489,7 +2515,7 @@ with tab_master:
     st.caption(
         "Edit rates below — the page will not refresh while you type. "
         "Use # for row order. Click **Save** to sort rows by # and store permanently in the database. "
-        f"Factory defaults load from `{_MASTER_RATES_CSV}`."
+        "Factory defaults are now hardcoded in the app."
     )
 
     if "rates_version" not in st.session_state:
@@ -2530,7 +2556,7 @@ with tab_master:
             "💾 Save paint specification rates", type="primary", use_container_width=True
         )
         reset_clicked = btn_reset.form_submit_button(
-            "🔄 Reset paint rates to bundled defaults (CSV)", use_container_width=True
+            "🔄 Reset paint rates to hardcoded defaults", use_container_width=True
         )
         cancel_clicked = btn_cancel.form_submit_button(
             "❌ Cancel / Discard paint rate changes", use_container_width=True
@@ -2559,7 +2585,7 @@ with tab_master:
         _update_session_rates_from_df(st.session_state.master_rates_df)
         st.session_state.rates_version += 1
         _clear_streamlit_widget_key(_MASTER_RATES_EDITOR_KEY)
-        st.success(f"Bundled default paint rates restored from `{_MASTER_RATES_CSV}`.")
+        st.success("Hardcoded default paint rates restored.")
         st.rerun()
 
     if cancel_clicked:
