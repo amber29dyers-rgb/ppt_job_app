@@ -2,5 +2,5 @@ streamlit>=1.48.0
 pandas
 plotly
 docxtpl
-pywin32
+pywin32; platform_system == "Windows"
 python-docx
