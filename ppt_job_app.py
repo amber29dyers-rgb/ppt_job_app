@@ -1800,12 +1800,16 @@ def _load_master_rates_dataframe():
             for i, item in enumerate(custom_rates)
         ]
         return pd.DataFrame(data)
+    csv_df = _load_master_rates_from_csv()
+    if csv_df is not None and not csv_df.empty:
+        return csv_df
     xlsx_df = _load_master_rates_from_xlsx()
     if xlsx_df is not None and not xlsx_df.empty:
         return xlsx_df
     return pd.DataFrame(DEFAULT_MASTER_RATES)
 
 
+_MASTER_RATES_CSV = "2026-06-17T07-33_export.csv"
 _MASTER_RATES_XLSX = "Updated_MasterRates_06152026.xlsx"
 
 
@@ -1844,6 +1848,59 @@ def _load_master_rates_from_xlsx():
             "Default Job Notes": str(row.get("Default Job Notes", "") or ""),
         })
     return pd.DataFrame(records) if records else None
+
+
+def _load_master_rates_from_csv():
+    """Load paint specification rates from the bundled master rates CSV export."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), _MASTER_RATES_CSV)
+    if not os.path.isfile(path):
+        return None
+
+    df = None
+    for enc in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            df = pd.read_csv(path, encoding=enc)
+            break
+        except Exception:
+            df = None
+    if df is None or df.empty:
+        return None
+    if "#" in df.columns:
+        df = df.sort_values("#", kind="stable")
+
+    records = []
+    for _, row in df.iterrows():
+        item = str(row.get("Item", "")).strip()
+        if not item:
+            continue
+        sort_n = row.get("#") if "#" in df.columns else len(records) + 1
+        records.append(
+            {
+                "#": int(sort_n) if pd.notna(sort_n) else len(records) + 1,
+                "Item": item,
+                "Unit": _normalize_master_rates_unit(row.get("Unit", "m²")),
+                "Material (R/unit)": float(row["Material (R/unit)"])
+                if pd.notna(row.get("Material (R/unit)"))
+                else 0.0,
+                "Labour (R/unit)": float(row["Labour (R/unit)"])
+                if pd.notna(row.get("Labour (R/unit)"))
+                else 0.0,
+                "Default Job Notes": str(row.get("Default Job Notes", "") or ""),
+            }
+        )
+
+    return pd.DataFrame(records) if records else None
+
+
+def _load_bundled_master_rates_defaults():
+    """Load bundled defaults from CSV, then XLSX, then fallback constants."""
+    csv_df = _load_master_rates_from_csv()
+    if csv_df is not None and not csv_df.empty:
+        return csv_df
+    xlsx_df = _load_master_rates_from_xlsx()
+    if xlsx_df is not None and not xlsx_df.empty:
+        return xlsx_df
+    return pd.DataFrame(DEFAULT_MASTER_RATES)
 
 
 def _normalize_master_rates_df(df=None):
@@ -1885,72 +1942,7 @@ _MASTER_RATES_EDITOR_KEY = "master_rates_editor"
 
 
 # Default master rates when nothing is saved in the database yet
-DEFAULT_MASTER_RATES = [
-    {"Item": "High Pressure Washing", "Unit": "each", "Material (R/unit)": 980, "Labour (R/unit)": 700,
-     "Default Job Notes": "NOTE TO CLIENT: This is a noisy process and can be messy. This should not take more than the indicted days and will be cleaned up. Please point out water sources to be used to the Team Leader upon commencment of work.\n•\tHigh pressure wash min pressure 200 bar  \n•\tWash to remove all salt and dirt + Loose material from area. \n•\tWhen working on the roof use safety harness and anchor point for safety. \n•\tUse drop sheet and garbage bags to collect all loose material generated. \n•\tPerform cleanup of the area before commencing to with next step"},
-    {"Item": "Plaster Repair", "Unit": "m²", "Material (R/unit)": 80, "Labour (R/unit)": 50,
-     "Default Job Notes": "•\tRemove ALL loose, defective and damaged plaster\n•\tPrime area with 1 coat bonding liquid\n•\tRepair with Paintsmiths PLASTER REPAIR KIT\n•\tDo not exceed 20mm thickness.\n•\tDo not rush curing â€“ insufficient curing leads to failure\n•\tWet plaster 2 times daily or cover with dropsheet after first wetting.\n•\tSmoothen plaster or use a sponge to match existing texture."},
-    {"Item": "Crack Repairs", "Unit": "m²", "Material (R/unit)": 30, "Labour (R/unit)": 45,
-     "Default Job Notes": "•\tRake out all cracks wider than 0.5mm (not hairline cracks)\n•\tPrime with waterproofing slurry kit OR PCT36\n•\tBuild up cracks with REPAIR MIX\n•\tSmoothen or use a sponge to match existing texture\n•\tOpen all expansion joints and seal with All Round Sealer"},
-    {"Item": "Wood Repair", "Unit": "lm", "Material (R/unit)": 50, "Labour (R/unit)": 50,
-     "Default Job Notes": "•\tRemove damaged coating, loose materials or rotten wood.\n•\tSand down reamining wood to uniform matt finish\n•\tPrime all replacement pieces of wood with Wood Primer\n•\tSpot prime nails, hinges and fittings with Metal Etch Primer\n•\tTreat knots or resin marks with Knotting and Wood sealer\n•\tAllow to dry and lightly sand to create a good surface for priming"},
-    {"Item": "Aluminium Restore", "Unit": "each", "Material (R/unit)": 11, "Labour (R/unit)": 35,
-     "Default Job Notes": "•\tRemove all loose contaminents with a soft bristle brush\n•\tSpray Aluminium Cleaner, let soak for 5 to 10min and wipe off\n•\tApply Alu Revivie to a soft fibre cloth and apply in circular motion till dry\n•\tAdd coates of Alu revive till desired finish is achieved"},
-    {"Item": "Roof Wash", "Unit": "m²", "Material (R/unit)": 12, "Labour (R/unit)": 700,
-     "Default Job Notes": "NOTE TO CLIENT: This is a noisy process and can be messy. This should not take more than the indicted days and will be cleaned up. Please point out water sources to be used to the Team Leader upon commencment of work.\n•\tHigh pressure wash min pressure 200 bar  \n•\tApply 1 coat Midas FUNGICIDAL WASH to all affected areas.\n•\tAllow minimum 24 hours reaction time.\n•\tRemove all growth with a stiff fibre brush.\n•\tApply SECOND coat of FUNGICIDAL WASH.\n•\tDO NOT rinse off the second coat.\n•\tFailure to follow this sequence risks regrowth. \n•\tWhen working on the roof use safety harness and anchor point for safety. \n•\tUse drop sheet and garbage bags to collect all loose material generated. \n•\tPerform cleanup of the area before commencing to with next step"},
-    {"Item": "Mould and Fungi Treatment", "Unit": "m²", "Material (R/unit)": 12, "Labour (R/unit)": 35,
-     "Default Job Notes": "•\tApply 1 coat Midas FUNGICIDAL WASH to all affected areas.\n•\tAllow minimum 24 hours reaction time.\n•\tRemove all growth with a stiff fibre brush.\n•\tApply SECOND coat of FUNGICIDAL WASH.\n•\tDO NOT rinse off the second coat.\n•\tFailure to follow this sequence risks regrowth."},
-    {"Item": "Skimming", "Unit": "m²", "Material (R/unit)": 75, "Labour (R/unit)": 90,
-     "Default Job Notes": "•\tComplete repairs first\n•\tAllow fillers and repairs to dry\n•\tUse a steel trowel and Exterior OR Interior Skimfill to achieve smooth uniform surface\n•\tSand lightly and wipe down before continuing to prime and paint"},
-    {"Item": "Facias/Gutters", "Unit": "lm", "Material (R/unit)": 30, "Labour (R/unit)": 25,
-     "Default Job Notes": "•\tEnsure surfaces are clean inside and out.\n•\tSeal leaks and joints using All Round Sealer, use Peel and Seel for larger gaps\n•\tApply 1 coat of Universal Primer\n•\tApply 2 coats of Midalux 240 (colour to be secified)"},
-    {"Item": "Exterior Walls Paintwork", "Unit": "m²", "Material (R/unit)": 35, "Labour (R/unit)": 35,
-     "Default Job Notes": "•\tPreperation work quoted separately\n•\tRemove all loose contaminents and let dry after Pressure Wash.\n•\tAllow any repair work to fully dry\n•\tSand lightly and remove dust\n•\tSpot prime repairs with Masonry Primer. On new build Prime entire wall with Masonry Primer\n•\tApply 2 coats of Midalux 240 (colour to be specified)"},
-    {"Item": "Roof Painting", "Unit": "m²", "Material (R/unit)": 55, "Labour (R/unit)": 65,
-     "Default Job Notes": "•\tEnsure roof is dry and clean. Do not paint in high humidity, temperature or probability of mist/rain.\n•\tSpot prime nails, roof screws and metal fittings with Rust Neutrelizer and Metal Etch Primer.\n•\tIf needed apply 1 coat of Primer\n•\tApply 2 coats of Midas Masteroof OR Rubberduck (colour to be specified)"},
-    {"Item": "Paint Metal- Windows/Doors", "Unit": "each", "Material (R/unit)": 185, "Labour (R/unit)": 275,
-     "Default Job Notes": "•\tClean metal with Midas Degreaser\n•\tLighlty sand metal to dull uniform surface\n•\tAdd caulk to frame and wall gaps\n•\tApply 1 coat Metaletch Primer\n•\tApply 1 coat Midaflow Gloss or Midas Masterroof (colour to be specified)"},
-    {"Item": "Paint Wood- Windows/Doors", "Unit": "each", "Material (R/unit)": 150, "Labour (R/unit)": 225,
-     "Default Job Notes": "•\tIf bare/ new wood present, apply Midas Woodprime to all new surfaces\n•\tLightly sand to uniform colour/appearance\n•\tAdd caulk to frame and wall gaps\n•\tReplace cracking/dry or missing putty. Use Putty Hardener\n•\tSpot prime nails, screws or metal fittings with Metal Etch Primer\n•\tApply 1 coat of Universal Undercoat\n•\tApply 2 coat of Midalux 240 OR 2 coats of Midaflow (ext) WB Non-Drip (int) (colour to be specified)"},
-    {"Item": "Timber Preserve- Windows/Doors", "Unit": "each", "Material (R/unit)": 125, "Labour (R/unit)": 175,
-     "Default Job Notes": "•\tLightly sand to uniform colour/appearance\n•\tAdd caulk to frame and wall gaps\n•\tReplace cracking/dry or missing putty. Use Putty Hardener\n•\tApply 1 coat of Timber Preserve**\n•\tLighlty sand and apply second coat of Timber Preserve**\n**Please note drying time is 48hrs +"},
-    {"Item": "Varnish Wood- Windows/Doors", "Unit": "each", "Material (R/unit)": 175, "Labour (R/unit)": 275,
-     "Default Job Notes": "•\tLightly sand to uniform colour/appearance\n•\tAdd caulk to frame and wall gaps\n•\tReplace cracking/dry or missing putty. Use Putty Hardener\n•\tApply 1 coat of Indoor/Outdoor Varnish and let dry\n•\tLightly sand and apply second coat of Indoor/Outdoor Varnish"},
-    {"Item": "Paint Wood", "Unit": "m²", "Material (R/unit)": 60, "Labour (R/unit)": 45,
-     "Default Job Notes": "•\tIf bare/ new wood present, apply Midas Woodprime to all new surfaces\n•\tLightly sand to uniform colour/appearance\n•\tAdd caulk to frame and wall gaps\n•\tReplace cracking/dry or missing putty. Use Putty Hardener\n•\tSpot prime nails, screws or metal fittings with Metal Etch Primer\n•\tApply 1 coat of Universal Undercoat\n•\tApply 2 coat of Midalux 240 OR 2 coats of Water Based Non-Drip Enamel (colour to be specified)"},
-    {"Item": "Varnish Wood", "Unit": "m²", "Material (R/unit)": 51, "Labour (R/unit)": 97,
-     "Default Job Notes": "•\tLightly sand to uniform colour/appearance\n•\tAdd caulk to frame and wall gaps\n•\tReplace cracking/dry or missing putty. Use Putty Hardener\n•\tApply 1 coat of Indoor/Outdoor Varnish and let dry\n•\tLightly sand and apply second coat of Indoor/Outdoor Varnish"},
-    {"Item": "Timber Preserve", "Unit": "m²", "Material (R/unit)": 70, "Labour (R/unit)": 45,
-     "Default Job Notes": "•\tLightly sand to uniform colour/appearance\n•\tAdd caulk to frame and wall gaps\n•\tReplace cracking/dry or missing putty. Use Putty Hardener\n•\tApply 1 coat of Timber Preserve**\n•\tLighlty sand and apply second coat of Timber Preserve**\n**Please note drying time is 48hrs +"},
-    {"Item": "Paint Galvanised Metal", "Unit": "m²", "Material (R/unit)": 125, "Labour (R/unit)": 45,
-     "Default Job Notes": "•\tLightly sand surface to dull uniform appearance\n•\tApply 1 coat of 504 Surface Tolerant Epoxy as Primer\n•\tAllow 6 to 12 hours (weather depending) to dry before overcoating\n•\tApply 1 coat of 504 Surface Tolerant Epoxy\n•\tAllow to Allow 6 to 12 hours (weather depending) to dry before overcoating\n•\tApply 2 coats of 112 Solvent Based Acrithane Sealer"},
-    {"Item": "Paint Metal", "Unit": "m²", "Material (R/unit)": 75, "Labour (R/unit)": 55,
-     "Default Job Notes": "•\tClean metal with Midas Degreaser\n•\tLighlty sand metal to dull uniform surface\n•\tAdd caulk to frame and wall gaps\n•\tApply 1 coat Metaletch Primer\n•\tApply 1 coat Midaflow Gloss or Midas Masterroof (colour to be specified)"},
-    {"Item": "Interior Walls Paintwork", "Unit": "m²", "Material (R/unit)": 35, "Labour (R/unit)": 35,
-     "Default Job Notes": "•\tIf not skimmed/repaired wash walls with Sugar Soap where contaminated\n•\tLet repairs/wash completely dry\n•\tSand repairs and spot prime with Plaster Primer. On new builds prime entire wall with Plaster Primer\n•\tApply two coats of Midafelt 230 (Colour to be specified)"},
-    {"Item": "Ceiling/Soffits", "Unit": "m²", "Material (R/unit)": 47, "Labour (R/unit)": 55,
-     "Default Job Notes": "•\tWash ceilings where necessary.\n•\tRemove all dust, cobwebs or loose contamination with soft bristle brush.\n•\tCaulk ceilings to cornice or wall.\n•\tFor skimmed ceilings, prime with Midas Plaster Primer.\n•\tApply 2coats of Midafelt 225 (colour to be specified)"},
-    {"Item": "Skirtings", "Unit": "lm", "Material (R/unit)": 45, "Labour (R/unit)": 35,
-     "Default Job Notes": "•\tRemove loose contaminents and wash with Midas Degreaser where neccesary\n•\tAllow to fully dry, then sand lightly to remove gloss and get a uniform finish.\n•\tCaulk skirting where neccesary\n•\tApply 1 coat of Universal Undercoat\n•\tAllow 4 hours for overcoating\n•\tApply 2 coats of Midafelt 225 OR 2 coats of Waterbased Non-drip Enamel (colour to be specified)"},
-    {"Item": "Cornices", "Unit": "lm", "Material (R/unit)": 35, "Labour (R/unit)": 35,
-     "Default Job Notes": "•\tRemove loose contaminents and wash with Midas Degreaser where neccesary\n•\tAllow to fully dry, then sand lightly to remove gloss and get a uniform finish.\n•\tCaulk cornice where neccesary\n•\tApply 1 coat of Universal Undercoat\n•\tAllow 4 hours for overcoating\n•\tApply 2 coats of Midafelt 225 OR 2 coats of Waterbased Non-drip Enamel (colour to be specified)"},
-    {"Item": "Waterproofing Rising Damp/ Horizontals", "Unit": "m²", "Material (R/unit)": 55, "Labour (R/unit)": 36,
-     "Default Job Notes": "•\tRemove all loose contaminants.\n•\tApply 1 coat of Waterpoof Slurry Kit from the floor to +-/ 30cm above the affected area.\n•\tWait 1 to 2 hours and apply second coat of Waterproof Slurry Kit to same area.\n•\tContinue with priming and painting."},
-    {"Item": "Waterproofing Roofs/Concrete Deks", "Unit": "m²", "Material (R/unit)": 105, "Labour (R/unit)": 55,
-     "Default Job Notes": "•\tRemove all loose contaminants and materials.\n•\tApply flashmesh and coat with PCT36 to corners.\n•\tApply two coats of PCT36 Slurry. Ligtly wet concrete before application.\n•\tContinue with priming and painting. PCT must be overcoated with UV resistant coating."},
-    {"Item": "Wood Floors - Sanded to Renew & Varnish", "Unit": "m²", "Material (R/unit)": 105, "Labour (R/unit)": 65,
-     "Default Job Notes": "• Note to Client: This is a dusty process. The complete floor must be done in one stage. The floor must be clear of furniture.\n• Vacuum the floor to remove dust.\n• Apply the first coat of indoor varnish thinned with 10% thinners to penetrate the wood.\n• Sand the first coat with 300-grit sandpaper in circular movements and wipe clean.\n• Apply the final coat. Second painter to lay off the wet varnish to prevent lines -maintaining a wet edge."},
-    {"Item": "Wood Floors/Rails/ Decks Varnish", "Unit": "m²", "Material (R/unit)": 45, "Labour (R/unit)": 55,
-     "Default Job Notes": "• Lightly sand wood to remove loose material and key in the new coat.\n• Apply 2 coats Indoor Varnish for woodwork."},
-    {"Item": "Tile Remove", "Unit": "each", "Material (R/unit)": 750, "Labour (R/unit)": 350,
-     "Default Job Notes": "•\tNote to Client: Work following tile removal is a provisional part of the quote- Dependant on substrate condition the quote will have to be reassessed.\n•\tLarger cracks, imperfections or soft/powdery tops, may influence the cost of Materials. Provision is made is this quote for smaller cracks and imperfections.\n•\tThis does not include skip rental, quoted under additionals\n•\tRemove tiles\n•\tRake out all cracks and vaccuum to remove loose contamination\n•\tUse anchoring and patching cement to fill all cracks\n•\tGrind open expansion joints in concrete slab and seal with Skifa FC11"},
-    {"Item": "Floors- Cup Grind (Prep)", "Unit": "m²", "Material (R/unit)": 30, "Labour (R/unit)": 45,
-     "Default Job Notes": "•\tNote to Client: Cup grinding is a noisy and dusty process. We recommend to remove all items from the room. We aim to complete the work in the prescribed time.\n•\tThrouogly sweep floor to remove loose conatminents.\n•\tVaccuum floor to remove all dust and finer contaminents.\n•\tPass the cup-grinder once over the area to achieve a level uniform top.\n•\tThe objective is to remove the top layer of concrete to create a key coat for the following steps."},
-    {"Item": "Floors- Cup Grind (Final)", "Unit": "m²", "Material (R/unit)": 75, "Labour (R/unit)": 90,
-     "Default Job Notes": "Note to Client: Cup grinding is a noisy and dusty process. We recommend to remove all items from the room. We aim to complete the work in the prescribed time.\n•\tThrouogly sweep floor to remove loose conatminents.\n•\tVaccuum floor to remove all dust and finer contaminents.\n•\tPass the cup-grinder once over the area to remove high spots\n•\tSweep and vacuum floor to remove all dust\n•\tUsing a straight edge, look for high spots and mark with chalk\n•\tPass over with the cup-grinder for a second time to cut a smooth uniform finish. \n•\tThe objective is to grind down the top to a smooth, flat surface, which can be cleaned and sealed."},
-    {"Item": "Pigmented Floor Cote", "Unit": "m²", "Material (R/unit)": 500, "Labour (R/unit)": 120,
-     "Default Job Notes": "•\tPREREQUISITES: All building work complete. Concrete min 25 MPa, moisture â‰¤ 10%. Minimum ambient temp: 15Â°C.\n•\tPRIME: Apply 1 coat Floor Screed Primer at Â±8 m²/L. Allow 4 hours to dry.\n•\tMIXING: Mix full 25 kg bag at once (liquid first, then powder) to a thick, lump-free paste. Must be applied in one continuous session â€“ do not stop mid-section.\n•\tAPPLY: Trowel onto floor at Â±3mm thick (4â€“5 m² per bag). Work towards yourself. Leave slight ridges or use sponge trowel for colour variation.\n•\tPOLISH OFF: Allow 60â€“90 min to set. Lightly wet with block brush + plastic float (circular motion). Finish with light steel trowel. Remove excess slurry immediately.\n•\tSEAL (24â€“48 hrs later): Sand with 200 grit; vacuum. Apply 1â€“2 coats Colour Retaining Primer (10 m²/L, 4â€“6 hrs between). Then 2â€“3 coats Acrithane sealer."},
-]
+DEFAULT_MASTER_RATES = []
 
 
 _ADDITIONAL_RATE_UNIT_OPTIONS = ["per day", "per km", "per 1000 liters", "per litre"]
@@ -2496,7 +2488,8 @@ with tab_master:
     st.header("Master Rates")
     st.caption(
         "Edit rates below — the page will not refresh while you type. "
-        "Use # for row order. Click **Save** to sort rows by # and store permanently in the database."
+        "Use # for row order. Click **Save** to sort rows by # and store permanently in the database. "
+        f"Factory defaults load from `{_MASTER_RATES_CSV}`."
     )
 
     if "rates_version" not in st.session_state:
@@ -2537,7 +2530,7 @@ with tab_master:
             "💾 Save paint specification rates", type="primary", use_container_width=True
         )
         reset_clicked = btn_reset.form_submit_button(
-            "🔄 Reset paint rates to factory defaults", use_container_width=True
+            "🔄 Reset paint rates to bundled defaults (CSV)", use_container_width=True
         )
         cancel_clicked = btn_cancel.form_submit_button(
             "❌ Cancel / Discard paint rate changes", use_container_width=True
@@ -2558,12 +2551,7 @@ with tab_master:
         st.rerun()
 
     if reset_clicked:
-        xlsx_df = _load_master_rates_from_xlsx()
-        source_df = (
-            xlsx_df
-            if xlsx_df is not None and not xlsx_df.empty
-            else pd.DataFrame(DEFAULT_MASTER_RATES)
-        )
+        source_df = _load_bundled_master_rates_defaults()
         _mr, _mu, _mn = _df_to_rate_dicts(source_df)
         db_local.save_custom_rates(_mr, _mu, _mn)
         st.session_state.master_rates_df = _prepare_master_rates_df(source_df)
@@ -2571,7 +2559,7 @@ with tab_master:
         _update_session_rates_from_df(st.session_state.master_rates_df)
         st.session_state.rates_version += 1
         _clear_streamlit_widget_key(_MASTER_RATES_EDITOR_KEY)
-        st.success("Factory default paint rates restored.")
+        st.success(f"Bundled default paint rates restored from `{_MASTER_RATES_CSV}`.")
         st.rerun()
 
     if cancel_clicked:
