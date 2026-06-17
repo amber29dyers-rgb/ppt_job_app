@@ -9,7 +9,6 @@ import os
 import shutil
 import smtplib
 import tempfile
-import pythoncom
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -18,11 +17,17 @@ from io import BytesIO
 
 import db_local
 
+try:
+    import pythoncom
+except ImportError:
+    pythoncom = None
+
 st.set_page_config(page_title="Pro Paint Teams Job/Site Worksheet", layout="wide")
 st.title("Pro Paint Teams Job/Site Worksheet App")
 st.caption("Version 2.7 – Master Rates: paint specs + additionals, edit in form, save to sort & store")
 
 DB_READY = True
+WINDOWS_COM_AVAILABLE = pythoncom is not None
 
 # ====================== HELPER FUNCTIONS ======================
 
@@ -1246,6 +1251,10 @@ def _convert_docx_to_pdf(
     letterhead_path: str = None,
 ) -> None:
     """Convert .docx to PDF using Word COM (ExportAsFixedFormat, then SaveAs fallback)."""
+    if not WINDOWS_COM_AVAILABLE:
+        raise RuntimeError(
+            "PDF conversion requires Microsoft Word on Windows and is not available in this environment."
+        )
     from win32com.client import DispatchEx
 
     docx_abs = os.path.abspath(docx_path)
@@ -1348,7 +1357,6 @@ def generate_letterhead_pdf(
         from docx import Document
         import tempfile
         import os
-        import pythoncom
         from docx.enum.section import WD_ORIENT
         from docx.shared import Pt, Inches
         from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -1385,6 +1393,10 @@ def generate_letterhead_pdf(
             shd.set(qn("w:val"), "clear")
             shd.set(qn("w:color"), "auto")
             shd.set(qn("w:fill"), fill)
+
+        if not WINDOWS_COM_AVAILABLE:
+            st.error("PDF generation with Word is only available on Windows.")
+            return None
 
         pythoncom.CoInitialize()
 
@@ -2972,6 +2984,10 @@ with tab_quote:
         try:
             from docxtpl import DocxTemplate
             import io, tempfile, os
+
+            if not WINDOWS_COM_AVAILABLE:
+                st.error("Emailing quote as PDF requires Microsoft Word on Windows.")
+                st.stop()
 
             pythoncom.CoInitialize()
 
